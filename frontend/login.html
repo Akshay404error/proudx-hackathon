@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log in — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="card auth-card card-elev">
+      <a href="index.html" class="logo" style="display:block;text-align:center;margin-bottom:24px;">PathForge</a>
+
+      <!-- ============ STEP 1: Form ============ -->
+      <div id="step-form">
+        <h2>Welcome back</h2>
+        <p class="sub">For your security, we'll email you a one-time code after your password.</p>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label>Email</label>
+            <input class="input" type="email" id="email" required autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input class="input" type="password" id="password" required autocomplete="current-password" />
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" type="submit" id="submit-btn">
+            Continue
+          </button>
+        </form>
+
+        <p class="auth-toggle">
+          New to PathForge? <a href="register.html">Create an account</a>
+        </p>
+      </div>
+
+      <!-- ============ STEP 2: OTP ============ -->
+      <div id="step-otp" class="hidden">
+        <a href="#" id="back-link" class="otp-step-back">← Back</a>
+        <h2>Verify it's you</h2>
+        <p class="sub">We sent a 6-digit code to <strong id="otp-email"></strong>. Enter it below to finish signing in.</p>
+
+        <div class="otp-meta">
+          Code expires in <strong id="countdown">10:00</strong>
+        </div>
+
+        <div class="otp-row" id="otp-row">
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" data-idx="0" />
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" data-idx="1" />
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" data-idx="2" />
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" data-idx="3" />
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" data-idx="4" />
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" data-idx="5" />
+        </div>
+
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;" id="verify-btn" disabled>
+          Verify &amp; sign in
+        </button>
+
+        <div class="otp-resend">
+          Didn't get it? <a href="#" id="resend-link">Resend code</a>
+          <span id="resend-cooldown" class="otp-countdown hidden"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/otp.js"></script>
+  <script>
+    if (PathForge.auth.isAuthed()) location.href = "dashboard.html";
+
+    let loginEmail = null;
+    let loginPassword = null;  // kept in memory only for resend
+
+    // ===== Step 1 =====
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("submit-btn");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Sending code…';
+
+      const data = {
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+      };
+
+      try {
+        await PathForge.api.loginRequest(data);
+        loginEmail = data.email;
+        loginPassword = data.password;
+        document.getElementById("otp-email").textContent = loginEmail;
+        document.getElementById("step-form").classList.add("hidden");
+        document.getElementById("step-otp").classList.remove("hidden");
+        PathForge.OTP.init({
+          onComplete: verifyOtp,
+          onResend: resendOtp,
+        });
+        PathForge.toast("Code sent! Check your email.");
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+        btn.disabled = false;
+        btn.innerHTML = "Continue";
+      }
+    });
+
+    // ===== Step 2 =====
+    async function verifyOtp(code) {
+      const btn = document.getElementById("verify-btn");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Verifying…';
+      try {
+        const result = await PathForge.api.loginVerify({
+          email: loginEmail, code, purpose: "login",
+        });
+        PathForge.auth.setSession(result.access_token, result.user);
+        PathForge.toast("Welcome back!");
+        setTimeout(() => location.href = "dashboard.html", 400);
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+        btn.innerHTML = "Verify &amp; sign in";
+        PathForge.OTP.shake();
+      }
+    }
+
+    async function resendOtp() {
+      // For login resend, we re-trigger login_request (it already passed password check once).
+      try {
+        await PathForge.api.loginRequest({ email: loginEmail, password: loginPassword });
+        PathForge.toast("New code sent.");
+        PathForge.OTP.resetTimer();
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+      }
+    }
+
+    document.getElementById("back-link").addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("step-otp").classList.add("hidden");
+      document.getElementById("step-form").classList.remove("hidden");
+      const btn = document.getElementById("submit-btn");
+      btn.disabled = false;
+      btn.innerHTML = "Continue";
+    });
+  </script>
+</body>
+</html>

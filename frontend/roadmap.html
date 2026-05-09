@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roadmap — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main class="container" style="padding-bottom:60px;">
+    <div id="rm-header"></div>
+    <div id="rm-body"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    PathForge.auth.redirectIfNotAuthed();
+    document.getElementById("nav").innerHTML = PathForge.renderNavbar("dashboard");
+    PathForge.attachLogout();
+
+    const params = new URLSearchParams(location.search);
+    const roadmapId = params.get("id");
+    if (!roadmapId) location.href = "dashboard.html";
+
+    let currentRoadmap = null;
+    let verifyCache = {};
+    let userVotes = {};
+
+    function progressFromMilestones(milestones) {
+      let total = 0, done = 0;
+      milestones.forEach(m => m.lessons.forEach(l => { total++; if (l.is_completed) done++; }));
+      return total === 0 ? 0 : Math.round((done / total) * 100);
+    }
+
+    function renderResource(lessonId, r) {
+      const url = r.url;
+      const verify = verifyCache[lessonId]?.[url];
+      const voteKey = `${lessonId}-${url}`;
+      const myVote = userVotes[voteKey];
+
+      let badges = "";
+      if (verify) {
+        badges += verify.is_alive
+          ? `<span class="res-badge alive">✓ alive</span>`
+          : `<span class="res-badge dead">✗ dead</span>`;
+        if (verify.is_curated_source) badges += `<span class="res-badge curated">⭐ curated</span>`;
+        badges += `<span class="res-score">${verify.quality_score}/10</span>`;
+      }
+
+      const fb = verify
+        ? `<span class="res-feedback">
+            <button class="${myVote === true ? 'active up' : ''}" onclick="vote(${lessonId}, '${encodeURIComponent(url)}', true)">👍 ${verify.helpful || 0}</button>
+            <button class="${myVote === false ? 'active down' : ''}" onclick="vote(${lessonId}, '${encodeURIComponent(url)}', false)">👎 ${verify.unhelpful || 0}</button>
+          </span>`
+        : "";
+
+      return `<a href="${PathForge.escapeHtml(url)}" target="_blank" rel="noopener" class="res-link">${PathForge.escapeHtml(r.type || 'article')}: ${PathForge.escapeHtml(r.title || 'Resource')}</a>${badges}${fb}`;
+    }
+
+    function render(rm) {
+      currentRoadmap = rm;
+      const pct = progressFromMilestones(rm.milestones);
+
+      document.getElementById("rm-header").innerHTML = `
+        <div style="padding-top:24px;">
+          <a href="dashboard.html" class="text-sm text-muted">← Back to dashboard</a>
+        </div>
+        <div class="dash-header" style="padding-top:12px;">
+          <div style="flex:1;min-width:0;">
+            <span class="pill" style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:var(--bg-elev-2);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${PathForge.escapeHtml(rm.skill_level)}</span>
+            <h1 style="margin-top:8px;">${PathForge.escapeHtml(rm.title)}</h1>
+            <p class="greet">${PathForge.escapeHtml(rm.goal)}</p>
+            <p class="text-sm text-muted mt-8">${PathForge.escapeHtml(rm.description || '')}</p>
+          </div>
+          <div style="text-align:right;">
+            <div class="text-xs text-muted">Progress</div>
+            <div style="font-size:32px;font-weight:800;color:var(--accent);">${pct}%</div>
+            <div class="text-xs text-muted">${rm.duration_weeks} weeks · ${rm.milestones.length} milestones</div>
+          </div>
+        </div>
+        <div class="progress-bar" style="margin-bottom:24px;">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+      `;
+
+      const body = document.getElementById("rm-body");
+      body.innerHTML = rm.milestones.map((m, i) => {
+        const mDone = m.lessons.length > 0 && m.lessons.every(l => l.is_completed);
+        return `
+        <div class="milestone" data-mid="${m.id}">
+          <div class="milestone-head ${i === 0 ? 'open' : ''}" onclick="toggleMilestone(this)">
+            <div class="flex items-center gap-12">
+              <div class="milestone-num ${mDone ? 'done' : ''}">${mDone ? '✓' : (i+1)}</div>
+              <div>
+                <h3>${PathForge.escapeHtml(m.title)}</h3>
+                <div class="meta">${m.lessons.length} lessons · ${m.estimated_hours}h estimated</div>
+              </div>
+            </div>
+            <div class="text-muted text-sm">▼</div>
+          </div>
+          <div class="milestone-body ${i === 0 ? 'open' : ''}">
+            ${m.description ? `<p class="text-sm text-muted" style="padding:8px 0;">${PathForge.escapeHtml(m.description)}</p>` : ''}
+            ${m.lessons.map(l => `
+              <div class="lesson" data-lid="${l.id}">
+                <div class="check ${l.is_completed ? 'done' : ''}" onclick="toggleLesson(${l.id}, ${l.is_completed})">
+                  ${l.is_completed ? '✓' : ''}
+                </div>
+                <div class="lesson-info ${l.is_completed ? 'done' : ''}">
+                  <div class="title">
+                    ${PathForge.escapeHtml(l.title)}
+                    ${l.resources && l.resources.length > 0 ? `<button class="verify-btn" onclick="verifyLesson(${l.id})">🔍 Verify links</button>` : ''}
+                  </div>
+                  ${l.summary ? `<div class="summary">${PathForge.escapeHtml(l.summary)}</div>` : ''}
+                  ${l.resources && l.resources.length ? `
+                    <div class="resources" id="res-${l.id}">
+                      ${l.resources.map(r => renderResource(l.id, r)).join("<br/>")}
+                    </div>` : ''}
+                </div>
+                <div class="meta-tag">${l.estimated_minutes}min · +${l.xp_reward}XP</div>
+              </div>
+            `).join("")}
+            ${m.projects.map(p => `
+              <div class="project-block">
+                <h4>🎯 PROJECT · +${p.xp_reward}XP</h4>
+                <div class="text-sm" style="font-weight:600;margin-bottom:4px;">${PathForge.escapeHtml(p.title)}</div>
+                <div class="desc">${PathForge.escapeHtml(p.description)}</div>
+                ${p.requirements && p.requirements.length ? `
+                  <ul>${p.requirements.map(r => `<li>${PathForge.escapeHtml(r)}</li>`).join("")}</ul>` : ''}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `}).join("");
+    }
+
+    window.toggleMilestone = (head) => {
+      head.classList.toggle("open");
+      head.nextElementSibling.classList.toggle("open");
+    };
+
+    window.toggleLesson = async (lessonId, isCompleted) => {
+      try {
+        if (isCompleted) {
+          await PathForge.api.uncompleteLesson(lessonId);
+        } else {
+          const r = await PathForge.api.completeLesson(lessonId);
+          if (r.xp_earned) PathForge.toast(`+${r.xp_earned} XP! 🔥 ${r.current_streak}-day streak`);
+        }
+        const rm = await PathForge.api.getRoadmap(roadmapId);
+        render(rm);
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+      }
+    };
+
+    window.verifyLesson = async (lessonId) => {
+      PathForge.toast("Verifying links...");
+      try {
+        const r = await PathForge.api.verifyResources(lessonId);
+        verifyCache[lessonId] = r.results;
+        const lesson = currentRoadmap.milestones.flatMap(m => m.lessons).find(l => l.id === lessonId);
+        if (lesson && lesson.resources) {
+          document.getElementById(`res-${lessonId}`).innerHTML =
+            lesson.resources.map(res => renderResource(lessonId, res)).join("<br/>");
+        }
+        PathForge.toast(`Checked ${Object.keys(r.results).length} link(s)`);
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+      }
+    };
+
+    window.vote = async (lessonId, encodedUrl, isHelpful) => {
+      const url = decodeURIComponent(encodedUrl);
+      try {
+        const r = await PathForge.api.submitFeedback({
+          lesson_id: lessonId, resource_url: url, is_helpful: isHelpful,
+        });
+        userVotes[`${lessonId}-${url}`] = isHelpful;
+        if (verifyCache[lessonId] && verifyCache[lessonId][url]) {
+          verifyCache[lessonId][url].helpful = r.helpful;
+          verifyCache[lessonId][url].unhelpful = r.unhelpful;
+        }
+        const lesson = currentRoadmap.milestones.flatMap(m => m.lessons).find(l => l.id === lessonId);
+        if (lesson && lesson.resources) {
+          document.getElementById(`res-${lessonId}`).innerHTML =
+            lesson.resources.map(res => renderResource(lessonId, res)).join("<br/>");
+        }
+        PathForge.toast(isHelpful ? "Thanks! 👍" : "Got it 👎");
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+      }
+    };
+
+    async function load() {
+      try {
+        const rm = await PathForge.api.getRoadmap(roadmapId);
+        render(rm);
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+        setTimeout(() => location.href = "dashboard.html", 1500);
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main class="container" style="padding-bottom:60px;">
+    <div id="profile-area"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById("nav").innerHTML = PathForge.renderNavbar("profile");
+    PathForge.attachLogout();
+
+    const params = new URLSearchParams(location.search);
+    const username = params.get("u") || PathForge.auth.getUser()?.username;
+    if (!username) location.href = "login.html";
+
+    function render(profile, roadmaps) {
+      document.getElementById("profile-area").innerHTML = `
+        <div class="card card-elev" style="margin-top:32px;">
+          <div class="flex gap-16 items-center" style="flex-wrap:wrap;">
+            <div style="width:80px;height:80px;border-radius:50%;background:var(--gradient);display:grid;place-items:center;font-size:32px;font-weight:800;color:white;flex-shrink:0;">
+              ${PathForge.escapeHtml((profile.full_name || profile.username)[0].toUpperCase())}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <h1 style="font-size:28px;letter-spacing:-0.02em;">${PathForge.escapeHtml(profile.full_name || profile.username)}</h1>
+              <p class="text-muted">@${PathForge.escapeHtml(profile.username)}</p>
+              ${profile.bio ? `<p style="margin-top:8px;">${PathForge.escapeHtml(profile.bio)}</p>` : ''}
+            </div>
+          </div>
+          <div class="stats-row" style="margin-top:24px;margin-bottom:0;">
+            <div class="stat warm">
+              <div class="label">🔥 Streak</div>
+              <div class="value">${profile.current_streak}</div>
+              <div class="delta">Best: ${profile.longest_streak}</div>
+            </div>
+            <div class="stat accent">
+              <div class="label">⚡ Total XP</div>
+              <div class="value">${profile.total_xp.toLocaleString()}</div>
+            </div>
+            <div class="stat">
+              <div class="label">🗺️ Roadmaps</div>
+              <div class="value">${profile.roadmaps_count}</div>
+            </div>
+            <div class="stat">
+              <div class="label">✅ Lessons</div>
+              <div class="value">${profile.completed_lessons}</div>
+            </div>
+          </div>
+        </div>
+
+        <h2 style="font-size:22px;margin:32px 0 16px;font-weight:800;">Public Roadmaps</h2>
+        ${roadmaps.length === 0
+          ? `<div class="card empty-state"><div class="icon">📭</div><p>No public roadmaps yet.</p></div>`
+          : `<div class="roadmap-grid">${roadmaps.map(rm => `
+            <div class="card roadmap-card">
+              <span class="pill" style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;background:var(--bg-elev-2);color:var(--text-muted);text-transform:uppercase;font-weight:600;">${PathForge.escapeHtml(rm.skill_level)}</span>
+              <h3>${PathForge.escapeHtml(rm.title)}</h3>
+              <p class="goal">${PathForge.escapeHtml(rm.goal)}</p>
+              <div class="progress-bar"><div class="progress-fill" style="width:${rm.progress_percent}%"></div></div>
+              <div class="progress-row">
+                <span>${rm.progress_percent}% complete</span>
+                <span>${rm.duration_weeks} weeks</span>
+              </div>
+            </div>
+          `).join("")}</div>`
+        }
+      `;
+    }
+
+    async function load() {
+      try {
+        const [profile, roadmaps] = await Promise.all([
+          PathForge.api.publicProfile(username),
+          PathForge.api.publicRoadmaps(username),
+        ]);
+        render(profile, roadmaps);
+      } catch (err) {
+        document.getElementById("profile-area").innerHTML = `
+          <div class="card empty-state" style="margin-top:40px;">
+            <div class="icon">❌</div>
+            <h3 style="color:var(--text);margin-bottom:6px;">Profile unavailable</h3>
+            <p>${PathForge.escapeHtml(err.message)}</p>
+            <a href="dashboard.html" class="btn btn-primary mt-16">Go to dashboard</a>
+          </div>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Coach — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <div class="chat-wrap">
+    <div class="chat-messages" id="messages">
+      <div class="msg assistant">
+        <div class="avatar">P</div>
+        <div class="bubble">
+          Hi! I'm your AI learning coach. Tell me what you want to learn — I'll help you turn it into a clear, achievable roadmap.
+          <br><br>
+          <em class="text-muted text-sm">Try: "I want to become a backend engineer in 6 months. I know Python basics."</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-row">
+      <input
+        class="input" id="msg-input"
+        placeholder="Type your goal or reply…"
+        autofocus
+      />
+      <button class="btn btn-primary" id="send-btn">Send</button>
+    </div>
+  </div>
+
+  <!-- Roadmap generation modal -->
+  <div class="modal-overlay" id="gen-modal">
+    <div class="modal">
+      <h3>Generate your roadmap</h3>
+      <p class="text-muted text-sm mb-16">Tweak these settings, then let AI build your personalized path.</p>
+
+      <div class="form-group">
+        <label>Goal</label>
+        <textarea class="textarea" id="gen-goal"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Skill level</label>
+        <select class="select" id="gen-level">
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Duration (weeks)</label>
+        <input class="input" type="number" id="gen-weeks" value="12" min="2" max="52" />
+      </div>
+      <div class="form-group">
+        <label>Hours per week</label>
+        <input class="input" type="number" id="gen-hours" value="10" min="1" max="60" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="gen-cancel">Cancel</button>
+        <button class="btn btn-primary" id="gen-confirm">Generate ✨</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    PathForge.auth.redirectIfNotAuthed();
+    document.getElementById("nav").innerHTML = PathForge.renderNavbar("chat");
+    PathForge.attachLogout();
+
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("msg-input");
+    const sendBtn = document.getElementById("send-btn");
+
+    function addMessage(role, content, raw = false) {
+      const el = document.createElement("div");
+      el.className = `msg ${role}`;
+      const initial = role === "user" ? (PathForge.auth.getUser().username[0] || "U").toUpperCase() : "P";
+      el.innerHTML = `
+        <div class="avatar">${initial}</div>
+        <div class="bubble">${raw ? content : PathForge.escapeHtml(content).replace(/\n/g, "<br>")}</div>
+      `;
+      messages.appendChild(el);
+      messages.scrollTop = messages.scrollHeight;
+      return el;
+    }
+
+    function addTyping() {
+      const el = document.createElement("div");
+      el.className = "msg assistant";
+      el.id = "typing-indicator";
+      el.innerHTML = `
+        <div class="avatar">P</div>
+        <div class="bubble"><span class="typing"><span></span><span></span><span></span></span></div>
+      `;
+      messages.appendChild(el);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    function removeTyping() {
+      document.getElementById("typing-indicator")?.remove();
+    }
+
+    let pendingGoal = null;
+
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage("user", text);
+      input.value = "";
+      sendBtn.disabled = true;
+      addTyping();
+
+      try {
+        const data = await PathForge.api.chat(text);
+        removeTyping();
+        addMessage("assistant", data.reply);
+        if (data.suggest_roadmap && data.extracted_goal) {
+          pendingGoal = data.extracted_goal;
+          // Inject CTA
+          const cta = `
+            <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+              <div class="text-sm" style="margin-bottom:8px;">
+                <strong>Goal captured:</strong> ${PathForge.escapeHtml(data.extracted_goal)}
+              </div>
+              <button class="btn btn-warm btn-sm" id="open-gen-btn">⚡ Generate Roadmap</button>
+            </div>
+          `;
+          // Append to last message
+          const last = messages.lastElementChild.querySelector(".bubble");
+          last.insertAdjacentHTML("beforeend", cta);
+          document.getElementById("open-gen-btn").addEventListener("click", openGenModal);
+        }
+      } catch (err) {
+        removeTyping();
+        addMessage("assistant", `Sorry, I hit an error: ${err.message}. Make sure Ollama is running locally.`);
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    function openGenModal() {
+      document.getElementById("gen-goal").value = pendingGoal || "";
+      document.getElementById("gen-modal").classList.add("show");
+    }
+    function closeGenModal() {
+      document.getElementById("gen-modal").classList.remove("show");
+    }
+    document.getElementById("gen-cancel").addEventListener("click", closeGenModal);
+
+    document.getElementById("gen-confirm").addEventListener("click", async () => {
+      const data = {
+        goal: document.getElementById("gen-goal").value.trim(),
+        skill_level: document.getElementById("gen-level").value,
+        duration_weeks: parseInt(document.getElementById("gen-weeks").value, 10),
+        hours_per_week: parseInt(document.getElementById("gen-hours").value, 10),
+      };
+      if (!data.goal || data.goal.length < 5) {
+        PathForge.toast("Please describe your goal in more detail.", "error");
+        return;
+      }
+      closeGenModal();
+      PathForge.showLoader("Forging your personalized roadmap… (this may take 30-60s with local Ollama)");
+      try {
+        const rm = await PathForge.api.generateRoadmap(data);
+        PathForge.hideLoader();
+        PathForge.toast("Roadmap ready! Redirecting…");
+        setTimeout(() => location.href = `roadmap.html?id=${rm.id}`, 600);
+      } catch (err) {
+        PathForge.hideLoader();
+        PathForge.toast(`Generation failed: ${err.message}`, "error");
+      }
+    });
+
+    sendBtn.addEventListener("click", send);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+  </script>
+</body>
+</html>

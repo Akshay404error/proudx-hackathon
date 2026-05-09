@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PathForge — AI Learning Roadmap Platform</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Stop drowning in resources.<br />
+        <span class="grad">Forge your path.</span></h1>
+      <p class="lead">
+        PathForge turns your learning goal into a structured AI-generated roadmap —
+        with milestones, curated resources, projects, and streak-based progress tracking.
+      </p>
+      <div class="hero-cta">
+        <a href="register.html" class="btn btn-primary btn-lg">Start Learning Free</a>
+        <a href="login.html" class="btn btn-ghost btn-lg">I have an account</a>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="card feature-card">
+        <div class="feature-icon">💬</div>
+        <h3>Chat your goal</h3>
+        <p>Tell our AI coach what you want to learn — naturally. No forms, no checklists.</p>
+      </div>
+      <div class="card feature-card">
+        <div class="feature-icon">🗺️</div>
+        <h3>Personalized roadmaps</h3>
+        <p>Get milestones, lessons, and capstone projects tailored to your level and timeline.</p>
+      </div>
+      <div class="card feature-card">
+        <div class="feature-icon">🔥</div>
+        <h3>Streaks &amp; XP</h3>
+        <p>Stay consistent with daily streaks, XP rewards, and a GitHub-style activity heatmap.</p>
+      </div>
+      <div class="card feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Shareable profile</h3>
+        <p>Show mentors, recruiters, and institutions a verified record of what you've learned.</p>
+      </div>
+      <div class="card feature-card">
+        <div class="feature-icon">👥</div>
+        <h3>Mentor dashboard</h3>
+        <p>Mentors and universities track multiple learners' progress in real time.</p>
+      </div>
+      <div class="card feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Local &amp; private</h3>
+        <p>Powered by local Ollama. Your goals and progress never leave your machine.</p>
+      </div>
+    </section>
+
+    <section style="padding: 60px 0; text-align: center;">
+      <h2 style="font-size: 32px; margin-bottom: 12px;">Built for the next generation of self-learners.</h2>
+      <p class="text-muted" style="max-width:540px;margin:0 auto 24px;">
+        Whether you're cracking competitive programming, mastering machine learning, or switching domains —
+        PathForge keeps you accountable.
+      </p>
+      <a href="register.html" class="btn btn-warm btn-lg">Forge Your First Path →</a>
+    </section>
+  </main>
+
+  <footer style="border-top: 1px solid var(--border); padding: 24px 0; text-align: center; color: var(--text-dim); font-size: 13px;">
+    <div class="container">PathForge © 2026 · Built for Scaler ProdX Hackathon</div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById("nav").innerHTML = PathForge.renderNavbar("home");
+    PathForge.attachLogout();
+  </script>
+</body>
+</html>

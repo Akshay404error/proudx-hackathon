@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reports — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main class="container" style="padding-bottom:60px;">
+    <div class="dash-header">
+      <div>
+        <h1>Reports</h1>
+        <p class="greet">Generate PDFs of your progress, resource bundle, or completion certificate.</p>
+      </div>
+    </div>
+
+    <div class="form-group" style="max-width:420px;">
+      <label>Select roadmap</label>
+      <select class="select" id="roadmap-select">
+        <option value="">Loading…</option>
+      </select>
+    </div>
+
+    <div class="roadmap-grid" id="report-cards"></div>
+  </main>
+
+  <!-- Email modal -->
+  <div class="modal-overlay" id="email-modal">
+    <div class="modal">
+      <h3>Email this report</h3>
+      <p class="text-muted text-sm mb-16">We'll send the PDF as an attachment.</p>
+      <div class="form-group">
+        <label>Send to</label>
+        <input class="input" type="email" id="email-target" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="email-cancel">Cancel</button>
+        <button class="btn btn-primary" id="email-send">📧 Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/reports.js"></script>
+</body>
+</html>

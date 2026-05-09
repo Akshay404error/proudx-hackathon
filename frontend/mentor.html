@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mentor Dashboard — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main class="container">
+    <div class="dash-header">
+      <div>
+        <h1>Mentor Dashboard</h1>
+        <p class="greet">Track learners' progress across all active roadmaps.</p>
+      </div>
+    </div>
+    <div id="learners-area"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    PathForge.auth.redirectIfNotAuthed();
+    document.getElementById("nav").innerHTML = PathForge.renderNavbar("mentor");
+    PathForge.attachLogout();
+
+    const user = PathForge.auth.getUser();
+    if (user.role !== "mentor" && user.role !== "institution") {
+      document.getElementById("learners-area").innerHTML = `
+        <div class="card empty-state">
+          <div class="icon">🔒</div>
+          <h3 style="color:var(--text);">Mentor access required</h3>
+          <p>This view is for mentor or institution accounts.</p>
+        </div>`;
+    } else {
+      load();
+    }
+
+    async function load() {
+      try {
+        const learners = await PathForge.api.mentorLearners();
+        const area = document.getElementById("learners-area");
+        if (learners.length === 0) {
+          area.innerHTML = `<div class="card empty-state"><div class="icon">👥</div><p>No public learners yet.</p></div>`;
+          return;
+        }
+        area.innerHTML = `<div class="roadmap-grid">${learners.map(l => `
+          <div class="card roadmap-card" onclick="location.href='profile.html?u=${encodeURIComponent(l.username)}'">
+            <div class="flex gap-12 items-center mb-8">
+              <div style="width:44px;height:44px;border-radius:50%;background:var(--gradient);display:grid;place-items:center;font-size:18px;font-weight:800;color:white;flex-shrink:0;">
+                ${PathForge.escapeHtml((l.full_name || l.username)[0].toUpperCase())}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <h3>${PathForge.escapeHtml(l.full_name || l.username)}</h3>
+                <p class="text-xs text-muted">@${PathForge.escapeHtml(l.username)}</p>
+              </div>
+            </div>
+            <p class="goal">${l.active_roadmap_title ? PathForge.escapeHtml(l.active_roadmap_title) : '<span class="text-dim">No active roadmap</span>'}</p>
+            <div class="progress-bar"><div class="progress-fill" style="width:${l.progress_percent}%"></div></div>
+            <div class="progress-row">
+              <span>${l.progress_percent}% · 🔥 ${l.current_streak}d</span>
+              <span>⚡ ${l.total_xp} XP</span>
+            </div>
+          </div>
+        `).join("")}</div>`;
+      } catch (err) {
+        document.getElementById("learners-area").innerHTML = `
+          <div class="card empty-state"><div class="icon">⚠️</div><p>${PathForge.escapeHtml(err.message)}</p></div>`;
+      }
+    }
+  </script>
+</body>
+</html>

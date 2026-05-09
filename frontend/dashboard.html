@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — PathForge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main class="container">
+    <div class="dash-header">
+      <div>
+        <h1 id="greeting">Welcome back 👋</h1>
+        <p class="greet">Pick up where you left off, or forge a new path.</p>
+      </div>
+      <div class="flex gap-8">
+        <a href="chat.html" class="btn btn-primary">+ New Roadmap</a>
+      </div>
+    </div>
+
+    <div class="stats-row" id="stats">
+      <div class="stat warm">
+        <div class="label">🔥 Current Streak</div>
+        <div class="value" id="streak-current">0</div>
+        <div class="delta" id="streak-best">Best: 0 days</div>
+      </div>
+      <div class="stat accent">
+        <div class="label">⚡ Total XP</div>
+        <div class="value" id="xp-total">0</div>
+        <div class="delta">Keep going!</div>
+      </div>
+      <div class="stat">
+        <div class="label">🗺️ Active Paths</div>
+        <div class="value" id="paths-count">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">✅ Lessons Done</div>
+        <div class="value" id="lessons-done">0</div>
+      </div>
+    </div>
+
+    <div class="card mb-24">
+      <div class="flex justify-between items-center mb-8">
+        <h3 style="font-size:16px;font-weight:700;">Activity (last 30 days)</h3>
+        <span class="text-xs text-dim">Hover for details</span>
+      </div>
+      <div class="heatmap" id="heatmap"></div>
+    </div>
+
+    <h2 style="font-size:22px;margin:8px 0 16px;font-weight:800;letter-spacing:-0.02em;">Your Roadmaps</h2>
+    <div id="roadmaps-area"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    PathForge.auth.redirectIfNotAuthed();
+    document.getElementById("nav").innerHTML = PathForge.renderNavbar("dashboard");
+    PathForge.attachLogout();
+
+    const user = PathForge.auth.getUser();
+    document.getElementById("greeting").textContent =
+      `Welcome back, ${user.full_name?.split(' ')[0] || user.username} 👋`;
+
+    function renderHeatmap(weekly) {
+      const el = document.getElementById("heatmap");
+      el.innerHTML = "";
+      weekly.forEach(d => {
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        const c = d.count;
+        if (c >= 1 && c <= 1) cell.classList.add("l1");
+        else if (c >= 2 && c <= 3) cell.classList.add("l2");
+        else if (c >= 4 && c <= 6) cell.classList.add("l3");
+        else if (c >= 7) cell.classList.add("l4");
+        cell.title = `${d.activity_date}: ${d.count} activities, ${d.xp_earned} XP`;
+        el.appendChild(cell);
+      });
+    }
+
+    function renderRoadmaps(roadmaps) {
+      const area = document.getElementById("roadmaps-area");
+      if (roadmaps.length === 0) {
+        area.innerHTML = `
+          <div class="card empty-state">
+            <div class="icon">🗺️</div>
+            <h3 style="font-size:18px;color:var(--text);margin-bottom:6px;">No roadmaps yet</h3>
+            <p>Chat with the AI Coach to create your first personalized roadmap.</p>
+            <a href="chat.html" class="btn btn-primary mt-16">Start Now</a>
+          </div>`;
+        return;
+      }
+      area.innerHTML = `<div class="roadmap-grid">${roadmaps.map(rm => `
+        <div class="card roadmap-card" onclick="location.href='roadmap.html?id=${rm.id}'">
+          <span class="pill">${PathForge.escapeHtml(rm.skill_level)}</span>
+          <h3>${PathForge.escapeHtml(rm.title)}</h3>
+          <p class="goal">${PathForge.escapeHtml(rm.goal)}</p>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${rm.progress_percent}%"></div>
+          </div>
+          <div class="progress-row">
+            <span>${rm.progress_percent}% complete</span>
+            <span>${rm.duration_weeks} weeks</span>
+          </div>
+        </div>
+      `).join("")}</div>`;
+    }
+
+    async function loadDashboard() {
+      try {
+        const [streak, roadmaps] = await Promise.all([
+          PathForge.api.getStreak(),
+          PathForge.api.listRoadmaps(),
+        ]);
+        document.getElementById("streak-current").textContent = streak.current_streak;
+        document.getElementById("streak-best").textContent = `Best: ${streak.longest_streak} days`;
+        document.getElementById("xp-total").textContent = streak.total_xp.toLocaleString();
+        document.getElementById("paths-count").textContent = roadmaps.length;
+        const lessonsDone = streak.weekly_activity.reduce((s, d) => s + d.count, 0);
+        document.getElementById("lessons-done").textContent = lessonsDone;
+
+        renderHeatmap(streak.weekly_activity);
+        renderRoadmaps(roadmaps);
+      } catch (err) {
+        PathForge.toast(err.message, "error");
+      }
+    }
+    loadDashboard();
+  </script>
+</body>
+</html>
