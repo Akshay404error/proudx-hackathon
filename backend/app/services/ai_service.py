@@ -104,7 +104,7 @@ class OllamaService:
     def __init__(self):
         self.base_url = settings.OLLAMA_BASE_URL.rstrip("/")
         self.model = settings.OLLAMA_MODEL
-        self.timeout = httpx.Timeout(180.0, connect=10.0)
+        self.timeout = httpx.Timeout(600.0, connect=10.0)
 
     async def health_check(self) -> bool:
         try:
